@@ -1,5 +1,3 @@
-import sys
-
 import torch
 
 from statistics import mean
@@ -95,5 +93,5 @@ def training_loop(
         else:
             if noimprove == tolerance:
                 print(f"Tolerance of {tolerance} reached, quitting.")
-                sys.exit()
+                return
             noimprove += 1

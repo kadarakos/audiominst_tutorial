@@ -266,11 +266,12 @@ class AudioClassifier(nn.Module):
             )
             for _ in range(n_blocks)
         ])
-        self.output_layer = nn.Linear(hidden_size, n_classes)
         if n_classes == 2:
+            self.output_layer = nn.Linear(hidden_size, 1)
             self.output_act = nn.Sigmoid()
             self.threshold = 0.5
         elif n_classes > 2:
+            self.output_layer = nn.Linear(hidden_size, n_classes)
             self.output_act = nn.Softmax(dim=-1)
             self.threshold = None
         else:
