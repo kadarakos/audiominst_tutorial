@@ -1,0 +1,18 @@
+[project]
+name = "audiomnist-tutorial"
+version = "0.1.0"
+description = "Add your description here"
+readme = "README.md"
+requires-python = ">=3.8"
+dependencies = [
+    "einops>=0.8.1",
+    "soundfile>=0.13.1",
+    "torch>=2.5.1",
+    "torchaudio>=2.5.1",
+    "tqdm>=4.67.2",
+]
+
+[dependency-groups]
+dev = [
+    "ruff>=0.14.14",
+]
