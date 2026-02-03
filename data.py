@@ -31,7 +31,8 @@ class AudioMNISTSample:
 
 def collate_fn_digit(batch: list[AudioMNISTSample]):
     wavs, labels = zip(*[(item.wav.squeeze(), item.digit) for item in batch])
-    return pad_sequence(wavs, batch_first=True), labels
+    targets = torch.tensor(labels, dtype=torch.long)
+    return pad_sequence(wavs, batch_first=True), targets
 
 
 def collate_fn_gender(batch: list[AudioMNISTSample]):

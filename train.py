@@ -11,6 +11,7 @@ from torch import nn
 from torch.optim import Optimizer
 from torch.utils.data import DataLoader
 from torch.nn.functional import binary_cross_entropy_with_logits
+from torch.nn.functional import cross_entropy
 
 
 CKPT_FNAME = Template("$name-$epoch.pt")
@@ -56,6 +57,10 @@ def training_loop(
     name: str = "",
     tolerance: int = 2,
 ):
+    if model.binary:
+        loss_func = binary_cross_entropy_with_logits
+    else:
+        loss_func = cross_entropy
     ckpt_dir = Path(ckpt_dir)
     best_acc = evaluate(model, test_loader)
     print(f"Accuracy before training: {best_acc}")
@@ -70,7 +75,7 @@ def training_loop(
             optimizer.zero_grad()
             wav, labels = batch
             logits = model(wav).squeeze()
-            loss = binary_cross_entropy_with_logits(logits, labels)
+            loss = loss_func(logits, labels)
             loss.backward()
             optimizer.step()
             avg_loss += (loss.item() - avg_loss) / total_steps

@@ -240,10 +240,11 @@ class AudioTokenizer(nn.Module):
         return x
 
 
-class GenderClassifier(nn.Module):
+class AudioClassifier(nn.Module):
     def __init__(
         self,
         sample_rate: int,
+        n_classes: int,
         n_mels: int,
         n_blocks: int,
         hidden_size: int,
@@ -253,6 +254,7 @@ class GenderClassifier(nn.Module):
         mlp_size: int | None = None,
     ):
         super().__init__()
+        self.n_classes = n_classes
         self.tokenizer = AudioTokenizer(sample_rate=sample_rate)
         self.trf_blocks = nn.Sequential(*[
             TrfBlock(
@@ -264,7 +266,27 @@ class GenderClassifier(nn.Module):
             )
             for _ in range(n_blocks)
         ])
-        self.output_layer = nn.Linear(hidden_size, 1)
+        self.output_layer = nn.Linear(hidden_size, n_classes)
+        if n_classes == 2:
+            self.output_act = nn.Sigmoid()
+            self.threshold = 0.5
+        elif n_classes > 2:
+            self.output_act = nn.Softmax(dim=-1)
+            self.threshold = None
+        else:
+            raise ValueError(
+                f"'n_classes' should be > 2, but found: {n_classes}."
+            )
+
+    @property
+    def binary(self):
+        return self.n_classes == 2
+
+    def set_threshold(self, threshold: float):
+        if self.threshold is None:
+            raise ValueError(
+                "Trying to set 'threshold' for softmax classifier."
+            )
 
     def forward(self, x: torch.Tensor) -> torch.Tensor:
         """
@@ -278,11 +300,7 @@ class GenderClassifier(nn.Module):
         return self.output_layer(last)
 
     @torch.inference_mode()
-    def predict(
-        self,
-        x: torch.Tensor,
-        threshold: float = 0.5
-    ) -> torch.Tensor:
+    def predict(self, x: torch.Tensor) -> torch.Tensor:
         """
         x: B x Seq x D.
         returns 0 - 1 decisions.
@@ -290,5 +308,9 @@ class GenderClassifier(nn.Module):
         tokenized = self.tokenizer(x)
         trf = self.trf_blocks(tokenized)
         last = trf[:, -1, :]
-        probs = F.sigmoid(self.output_layer(last)).squeeze()
-        return (probs > threshold).detach().numpy().astype(int)
+        probs = self.output_act(self.output_layer(last)).squeeze()
+        if self.binary:
+            preds = probs > self.threshold
+        else:
+            preds = probs.argmax(dim=-1)
+        return preds.detach().numpy().astype(int)
