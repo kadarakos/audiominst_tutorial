@@ -6,8 +6,8 @@ import soundfile
 import torchaudio
 
 from pathlib import Path
-from dataclasses import dataclass
-from typing import Literal, Callable
+from dataclasses import dataclass, asdict
+from typing import Literal, Callable, Any
 
 from tqdm import tqdm
 from torch.utils.data import DataLoader
@@ -25,6 +25,10 @@ class AudioMNISTSample:
     native: bool
     speaker: str
 
+    @property
+    def is_german(self):
+        return self.accent.lower() == "german"
+
     def __len__(self):
         return len(self.wav)
 
@@ -37,6 +41,12 @@ def collate_fn_digit(batch: list[AudioMNISTSample]):
 
 def collate_fn_gender(batch: list[AudioMNISTSample]):
     wavs, labels = zip(*[(item.wav.squeeze(), item.gender) for item in batch])
+    targets = torch.tensor(labels, dtype=torch.float32)
+    return pad_sequence(wavs, batch_first=True), targets
+
+
+def collate_fn_german(batch: list[AudioMNISTSample]):
+    wavs, labels = zip(*[(item.wav.squeeze(), item.is_german) for item in batch])
     targets = torch.tensor(labels, dtype=torch.float32)
     return pad_sequence(wavs, batch_first=True), targets
 

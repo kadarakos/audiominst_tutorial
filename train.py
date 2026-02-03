@@ -3,6 +3,7 @@ import torch
 from statistics import mean
 from string import Template
 from pathlib import Path
+from collections import Counter
 
 from tqdm import tqdm
 from torch import nn
@@ -37,11 +38,16 @@ def save_model(
 
 def evaluate(model: nn.Module, eval_loader: DataLoader) -> float:
     accs = []
+    label_counts = Counter()
     for batch in tqdm(eval_loader, desc="Evaluating"):
         wavs, labels = batch
+        label_counts.update(labels.numpy().tolist())
         preds = model.predict(wavs)
         acc = float((preds == labels).sum()) / len(labels)
         accs.append(acc)
+    Z = sum(list(label_counts.values()))
+    label_probs = {la: round(label_counts[la] / Z, 3) for la in label_counts}
+    print(f"Eval label proportions: {label_probs}")
     return mean(accs)
 
 
@@ -54,7 +60,15 @@ def training_loop(
     ckpt_dir: Path,
     name: str = "",
     tolerance: int = 2,
+    transfer_weights: Path | None = None,
 ):
+    if transfer_weights is not None:
+        print(f"Loading weights from: {transfer_weights}.")
+        sd = torch.load(transfer_weights)["model"]
+        new_sd = {
+            name: param for name, param in sd.items() if not name.startswith("output_layer")
+        }
+        model.load_state_dict(new_sd, strict=False)
     if model.binary:
         loss_func = binary_cross_entropy_with_logits
     else:
@@ -68,16 +82,21 @@ def training_loop(
     for epoch in range(epochs):
         desc = f"Epoch: {epoch}"
         pbar = tqdm(train_loader, desc=desc)
+        label_counts = Counter()
         for batch in pbar:
             total_steps += 1
             optimizer.zero_grad()
             wav, labels = batch
+            label_counts.update(labels.numpy().tolist())
             logits = model(wav).squeeze()
             loss = loss_func(logits, labels)
             loss.backward()
             optimizer.step()
             avg_loss += (loss.item() - avg_loss) / total_steps
             pbar.set_postfix_str(f"Loss: {round(avg_loss, 3)}")
+        Z = sum(list(label_counts.values()))
+        label_probs = {la: round(label_counts[la] / Z, 3) for la in label_counts}
+        print(f"Train label proportions: {label_probs}")
         acc = evaluate(model, test_loader)
         if acc > best_acc:
             best_acc = acc

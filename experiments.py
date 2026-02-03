@@ -1,6 +1,6 @@
 from torch.optim import AdamW
 
-from data import read_audio_mnist, collate_fn_digit
+from data import read_audio_mnist, collate_fn_digit, collate_fn_german
 from model import AudioClassifier
 from train import training_loop
 
@@ -21,7 +21,7 @@ def small_audio_cls(
     )
 
 
-def baseline_gender():
+def baseline_gender(epochs):
     sample_rate = 8000
     model = small_audio_cls(n_classes=2, sample_rate=sample_rate)
     train_loader, test_loader = read_audio_mnist(
@@ -33,7 +33,7 @@ def baseline_gender():
     training_loop(
         model=model,
         optimizer=optimizer,
-        epochs=10,
+        epochs=epochs,
         train_loader=train_loader,
         test_loader=test_loader,
         ckpt_dir=".",
@@ -41,7 +41,7 @@ def baseline_gender():
     )
 
 
-def baseline_digit():
+def baseline_digit(epochs: int = 10):
     sample_rate = 8000
     model = small_audio_cls(n_classes=10, sample_rate=sample_rate)
     train_loader, test_loader = read_audio_mnist(
@@ -54,13 +54,38 @@ def baseline_digit():
     training_loop(
         model=model,
         optimizer=optimizer,
+        epochs=epochs,
+        train_loader=train_loader,
+        test_loader=test_loader,
+        ckpt_dir=".",
+        name="digit_baseline",
+    )
+
+
+def digit_german_transfer():
+    print("Train digit first")
+    baseline_gender(epochs=1)
+    sample_rate = 8000
+    model = small_audio_cls(n_classes=2, sample_rate=sample_rate)
+    train_loader, test_loader = read_audio_mnist(
+        n_test_speakers=10,
+        resample=sample_rate,
+        batch_size=16,
+        collator=collate_fn_german,
+    )
+    optimizer = AdamW(model.parameters())
+    training_loop(
+        model=model,
+        optimizer=optimizer,
         epochs=10,
         train_loader=train_loader,
         test_loader=test_loader,
         ckpt_dir=".",
-        name="gender_baseline",
+        name="german",
+        transfer_weights="gender_baseline-0.pt",
     )
 
 
-baseline_gender()
+digit_german_transfer()
+# baseline_gender()
 # baseline_digit()
